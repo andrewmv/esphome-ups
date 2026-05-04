@@ -1,0 +1,129 @@
+# Andrew Villeneuve 2025/08
+# Monitor the status of an APC-compatible UPS via the USB port
+
+### Boilerplate ###
+
+esphome:
+  name: ${devicename}
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+  level: INFO
+  # logs:
+    # ups_hid: INFO
+    # ups_hid.apc: INFO
+    # ups_hid.apc_hid: INFO
+    # ups_hid.cyberpower: INFO
+    # ups_hid.generic: INFO
+    # usb_host: INFO
+    # ups_status_led: INFO
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: ${enckey}
+
+ota:
+  - platform: esphome
+    password: !secret apipw
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wappw
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${fallbackssid}
+    password: !secret hotspotpw  
+
+captive_portal:
+    
+### Dependency Setup ###
+
+external_components:
+  - source: github://bullshit/esphome-components
+    components: [ ups_hid, ups_status_led ]  # Add more components as needed
+
+# Use modular configuration packages for maintainable setup
+packages:
+  # base_ups: !include esphome-components/configs/base_ups.yaml           # Hardware, network, LED
+  essential: !include esphome-components/configs/essential_sensors.yaml  # Core 7 sensors
+  extended: !include esphome-components/configs/extended_sensors.yaml    # 17+ additional sensors
+  controls: !include esphome-components/configs/ups_controls.yaml        # Beeper/test buttons  
+  # device: !include esphome-components/configs/device_types/cyberpower_cp1500.yaml
+  device: !include esphome-components/configs/device_types/apc_backups_es.yaml
+  
+# Force inclusion of the button entity dependencies to workaround build issue
+button:
+  - platform: template
+    name: noop-button
+    internal: true
+
+# We need this for UPS communication
+# usb_host:
+#   enable_hubs: true
+#   devices:
+#     - id: cp1500
+#       vid: 0x0764
+#       pid: 0x0601
+
+### Implementation ###
+
+ups_hid:
+  id: ups_monitor
+  update_interval: 10s
+  protocol_timeout: 15s
+  protocol: ${ups_proto}
+  simulation_mode: ${simulation_mode}
+
+light:
+  - platform: esp32_rmt_led_strip
+    chipset: ws2812
+    pin: GPIO48
+    num_leds: 1
+    rgb_order: GRB
+    id: esp_rgb
+    name: "Status LED"
+    internal: false 
+
+ups_status_led:
+  id: ups_led_controller
+  ups_hid_id: ups_monitor        # Required: UPS HID component ID
+  light_id: esp_rgb           # Required: Light component ID
+  # time_id: sntp_time             # Optional: Time component for night mode
+  
+  enabled: true                  # Enable/disable LED (default: true)
+  brightness: 20%                # Base brightness 10-100% (default: 80%)
+  
+  # Battery color behavior
+  battery_color_mode: discrete   # discrete or gradient (default: discrete)
+  battery_low_threshold: 20      # Critical threshold % (default: 20)
+  battery_warning_threshold: 50  # Warning threshold % (default: 50)
+  
+  # # Night mode settings
+  # night_mode:
+  #   enabled: true               # Enable night mode (default: true)
+  #   brightness: 15%             # Night brightness (default: 15%)
+  #   start_time: "22:00"        # Start time HH:MM (default: 22:00)
+  #   end_time: "07:00"          # End time HH:MM (default: 07:00)
+
+time:
+  - platform: sntp
+    id: sntp_time
+
+text_sensor:
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: "UPS Status"
+    id: ups_status_text
+    type: status
+    
+  - platform: ups_hid
+    ups_hid_id: ups_monitor
+    name: "Detected Protocol"
+    id: ups_protocol
+    type: protocol

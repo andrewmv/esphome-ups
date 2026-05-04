@@ -1,0 +1,10 @@
+substitutions:
+  devicename: htpc-ups
+  friendlyname: Home Theater PC UPS
+  fallbackssid: HTPC UPS Fallback
+  enckey: !secret enckey
+  ups_proto: "cyberpower"
+  simulation_mode: "false"
+
+packages:
+  ups: !include common/ups.yaml

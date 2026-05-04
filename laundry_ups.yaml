@@ -1,0 +1,10 @@
+substitutions:
+  devicename: laundry-ups
+  friendlyname: Laundry Room UPS
+  fallbackssid: Laundry UPS Fallback
+  enckey: !secret enckey
+  ups_proto: "apc"
+  simulation_mode: "false"
+
+packages:
+  ups: !include common/ups.yaml
